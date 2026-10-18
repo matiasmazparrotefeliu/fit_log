@@ -1,3 +1,40 @@
-blog
-__pycache__
+# ── Python ───────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Entornos virtuales ───────────────────────
+.venv/
+venv/
+env/
+
+# ── Variables de entorno / secretos ──────────
 .env
+.env.*
+!.env.example
+
+# ── Base de datos ────────────────────────────
+*.sqlite3
+*.db
+
+# ── Node / Next.js (frontend, fase posterior) ─
+node_modules/
+.next/
+out/
+
+# ── Editores / SO ────────────────────────────
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ── Legacy (proyecto Django eliminado en Fase 0) ─
+blog/
+
+.ipynb
