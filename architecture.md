@@ -57,6 +57,17 @@ extraerse a un microservicio en el futuro sin reescribir la lógica de negocio.
 > En esta iteración el cache arranca **en memoria** detrás de `CachePort`; Redis se conecta
 > luego tras el mismo puerto, sin cambios en el dominio.
 
+### Convenciones de repositorio, configuración y empaquetado
+
+- **Layout:** el backend vive en `backend/`; los artefactos de infraestructura
+  (`docker-compose.yml`, `.env.example`, `.gitignore`, documentación) viven en la **raíz**.
+- **Configuración:** el `.env` reside **siempre en la raíz** del repositorio. `core/config.py`
+  lo resuelve con ruta absoluta (`PROJECT_ROOT = parents[3]`), independiente del cwd.
+- **Empaquetado:** `backend/Dockerfile` (+ `backend/.dockerignore`) construye la imagen de la API;
+  `docker-compose.yml` (raíz) define los servicios `db` (PostgreSQL) y `api` (build `./backend`).
+  Dentro de la red de Docker, la API apunta a la DB con host `db` (no `localhost`).
+- **Módulos:** cada módulo de dominio se crea **únicamente al llegar a su fase**.
+
 ---
 
 ## 3. Regla de dependencia (obligatoria)
@@ -86,7 +97,7 @@ presentation  ──►  application  ──►  domain  ◄──  infrastructu
 
 | Módulo | Responsabilidad | Reqs. funcionales |
 |---|---|---|
-| `auth` | Registro, login (JWT), perfil, RBAC (`runner`/`admin`) | RF-01 |
+| `auth` | Registro, login (JWT), perfil, RBAC (`runner`/`admin`/`super_admin`) | RF-01 |
 | `activity_types` | Catálogo de tipos de actividad | — |
 | `gear` | Calzado, desgaste acumulado y alertas de reemplazo | RF-02 |
 | `workouts` | Sesiones de entrenamiento; pace y RPE | RF-03 |
@@ -266,7 +277,8 @@ No se implementan por ahora:
 ```
 POST   /auth/register                 POST /auth/login  → JWT
 GET    /users/me                      PATCH /users/me
-GET    /users                         (admin)
+GET    /users                         (super_admin)
+POST   /users                         (super_admin; crea admin/runner)
 
 GET/POST/PATCH/DELETE  /gear          (+ GET /gear/{id}/wear)
 GET/POST/PATCH/DELETE  /workouts
@@ -280,7 +292,13 @@ GET                    /dashboard      (BFF Analytics)
 ```
 
 - Los endpoints privados resuelven `current_user` desde el JWT y filtran por `user_id`.
-- Las mutaciones de `/events` exigen rol **`admin`**.
+- **Roles:** `runner` (registro público), `admin` (creado por `super_admin`, escritura de
+  catálogos como `/events`) y `super_admin` (gestiona usuarios vía `/users`). El registro
+  público **nunca** permite elegir rol. El primer `super_admin` se crea con
+  `python -m scripts.create_super_admin` (bootstrap idempotente).
+- Las mutaciones de `/events` exigen rol **`admin`** (o superior).
+- Todos los endpoints declaran `response_model` de éxito y esquemas Pydantic de request;
+  los errores usan el formato uniforme `{"detail": "..."}` con códigos 401/403/409/422.
 - Documentación OpenAPI/Swagger en `/docs`.
 
 ---
@@ -303,19 +321,43 @@ GET                    /dashboard      (BFF Analytics)
 - La **base transversal** (inicialización + `core` + `shared`) se construye antes que cualquier módulo.
 - `requirements.txt` **crece por fase** (solo se declara lo que cada fase necesita).
 - La **primera fase funcional es F2 (auth/users)**.
+- `security`, `rbac` y `middleware` se implementan **junto con login/users/auth (F2)**.
+- El cache (`CachePort`) se implementa en **fases posteriores**.
+- El **manejo de errores es incremental**: se crea a medida que avanza la aplicación.
 
 ### Base transversal
 
-| Fase | Alcance |
-|---|---|
-| **F0** | **Inicialización de la app**: `main.py`, `requirements.txt`, `.env.example`, limpieza legacy (Django). Sin `core`, `shared`, Alembic, seed, docker ni módulos. |
-| **F1** | `core/` (config, database, security, rbac, cache, middleware, errors) + `shared/` (base_entity, unit_of_work, pagination) + `docker-compose.yml` (PostgreSQL) |
+| Fase | Alcance | Estado |
+|---|---|---|
+| **F0** | **Inicialización de la app**: `main.py`, `requirements.txt`, `.env.example` (raíz), limpieza legacy (Django). Sin `core`, `shared`, Alembic, seed, docker ni módulos. | ✅ |
+| **F1** | `core/` (`config`, `database`) + `shared/` (base_entity, unit_of_work, pagination) + `docker-compose.yml` (db+api) + `backend/Dockerfile` | ✅ |
+| **F2** | `auth` (users + JWT + RBAC) + `security`/`rbac`/`middleware` + Alembic (migración `0001_create_users`) + bootstrap `super_admin` + tests de integración | ✅ |
+
+### Detalle de la Fase 2 (`auth`)
+
+- **Capas:** `domain` (entidad `User`, `UserRole`, puerto `UserRepository`, errores),
+  `application` (DTOs `dataclass` + casos de uso), `infrastructure` (`UserModel` +
+  `SqlAlchemyUserRepository`, único punto con SQLAlchemy) y `presentation` (schemas
+  Pydantic + routers). La capa `application` no importa FastAPI.
+- **Seguridad:** contraseñas con **bcrypt** (`passlib`); JWT firmado con
+  `SECRET_KEY`/`ALGORITHM` que incluye `sub`, `role`, `iat` y `exp`.
+- **RBAC:** `get_current_principal` (claim-based) y `require_role(...)` en `core/rbac.py`.
+  La resolución del usuario completo contra la BD vive en `auth/presentation/dependencies.py`.
+- **CORS:** configurado en `core/middleware.py` desde `CORS_ORIGINS`; el rate limit
+  queda para una fase posterior (junto con `CachePort`).
+- **Roles:** `runner`, `admin`, **`super_admin`** (desvío aprobado de la spec original).
+  Registro público → siempre `runner`; `super_admin` crea `admin`/`runner` vía `POST /users`;
+  el primer `super_admin` se crea con `scripts/create_super_admin.py` (idempotente).
+- **Errores:** incrementales por módulo (`auth/domain/errors.py`), traducidos a HTTP en
+  `presentation`; formato uniforme `{"detail": "..."}`.
+- **Tests:** suite de integración autorizada para F2 (`backend/tests`) contra PostgreSQL
+  de test (`TEST_DATABASE_URL`), ejecutable en Docker con `docker-compose.test.yml`.
+  La Fase 13 (tests generales) sigue diferida.
 
 ### Una fase por módulo
 
 | Fase | Módulo | Extra de la fase |
 |---|---|---|
-| **F2** | `auth` (users + RBAC) | Alembic (primer modelo: `users`) |
 | **F3** | `activity_types` | Seed del catálogo |
 | **F4** | `gear` | — |
 | **F5** | `workouts` | — |
