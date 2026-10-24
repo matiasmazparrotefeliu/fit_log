@@ -1,0 +1,19 @@
+# ─────────────────────────────────────────────────────────────
+# Override SOLO para tests (Fase 2)
+#
+# Ejecuta la suite dentro de Docker reutilizando la imagen de la API:
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm api
+#
+# Monta `backend/` sobre `/app` para incluir `tests/` y `pytest.ini`,
+# y apunta a la base `fitlog_test` (se crea automáticamente si no existe).
+# ─────────────────────────────────────────────────────────────
+services:
+  api:
+    command: ["pytest", "-v"]
+    volumes:
+      - ./backend:/app
+    environment:
+      TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fitlog}:${POSTGRES_PASSWORD:-fitlog}@db:5432/fitlog_test
+    depends_on:
+      db:
+        condition: service_healthy
