@@ -74,6 +74,9 @@ Las reglas se agregan en la sección **«Registro de reglas»** (§ 9) con fecha
 7. Cerrar una fase = código + documentación actualizada + entregable verificable.
 8. Registrar SIEMPRE el avance en `README.md` y, si aplica, en `architecture.md`.
 9. No mezclar cambios de fases distintas en un mismo commit.
+10. `security`, `rbac` y `middleware` se implementan **junto con login/users/auth (F2)**, no antes.
+11. El cache (`CachePort`) se implementa en **fases posteriores** (primer consumidor: analytics).
+12. El manejo de errores se crea **incrementalmente** con cada módulo; no se crea un `errors.py` adelantado.
 
 ---
 
@@ -83,12 +86,16 @@ Las reglas se agregan en la sección **«Registro de reglas»** (§ 9) con fecha
    `docker-compose.yml` ni carpetas de módulos.
 2. ⛔ **NO crear tests sin autorización explícita** (ni `pytest`, ni `httpx`, ni `tests/`,
    ni `conftest.py`). La Fase 13 está **diferida** y requiere permiso puntual.
+   **Excepción vigente:** los tests de integración de F2 (registro, login y RBAC de
+   `auth`) están autorizados explícitamente; el resto sigue diferido.
 3. ⛔ **NO crear entornos virtuales.** El agente nunca ejecuta `python -m venv` ni crea
    `.venv`/`venv`/`env`. La gestión del entorno de Python es del responsable.
 4. ⛔ **NO crear vistas ni triggers** de base de datos.
 5. ⛔ **NO reintroducir código Django** (eliminado en Fase 0).
 6. ⛔ **NO implementar módulos futuros** antes de su fase.
 7. ⛔ **NO comittear secretos**: `.env` está en `.gitignore`; usar `.env.example`.
+8. ⛔ **El `.env` reside SIEMPRE en la raíz del repositorio.** El agente nunca crea ni escribe
+   el `.env` real; solo mantiene `.env.example`.
 
 ---
 
@@ -104,16 +111,19 @@ Las reglas se agregan en la sección **«Registro de reglas»** (§ 9) con fecha
 ## 8. Comandos de referencia
 
 ```bash
+# Variables de entorno (raíz del repo)
+cp .env.example .env
+
 # Dependencias (el entorno de Python lo gestiona el responsable)
 cd backend && pip install -r requirements.txt
 
-# Servidor de desarrollo (Fase 0)
+# Servidor de desarrollo
 cd backend && uvicorn app.main:app --reload
 
-# Base de datos local (desde Fase 1)
-cd backend && docker compose up -d db
+# Stack completo (db + api) — desde la RAÍZ
+docker compose up -d
 
-# Migraciones (desde Fase 2)
+# Migraciones (desde Fase 2, dentro de backend/)
 cd backend && alembic upgrade head
 cd backend && alembic revision --autogenerate -m "descripcion"
 ```
@@ -139,3 +149,13 @@ cd backend && alembic revision --autogenerate -m "descripcion"
 | 13 | `shared/` entra en F1 (core transversal) | F1 | Instrucción directa |
 | 14 | No crear entornos virtuales (`.venv`/`venv`/`env`); el entorno lo gestiona el responsable | — | Instrucción directa |
 | 15 | No crear tests sin autorización explícita (endurece la regla 3) | — | Instrucción directa |
+| 16 | El `.env` reside siempre en la raíz del repositorio | — | Instrucción directa |
+| 17 | El módulo `backend/` incluye su propio `Dockerfile` y `.dockerignore` | F1 | Instrucción directa |
+| 18 | `security`, `rbac` y `middleware` se implementan junto con login/users/auth (F2) | F2 | Instrucción directa |
+| 19 | El cache (`CachePort`) se implementa en fases posteriores | — | Instrucción directa |
+| 20 | El manejo de errores se crea incrementalmente con cada módulo | — | Instrucción directa |
+| 21 | Roles `runner`, `admin` y `super_admin`: el registro público crea siempre `runner`; `super_admin` crea `admin`/`runner`; el primer `super_admin` se crea con `scripts/create_super_admin.py` | F2 | Instrucción directa |
+| 22 | Todo endpoint declara `response_model` y schema de request; los errores usan el formato uniforme `{"detail": "..."}` | F2 | Instrucción directa |
+| 23 | Los DTOs de `application` son `dataclass`; Pydantic se usa solo en `presentation` | F2 | Instrucción directa |
+| 24 | Tests de F2 autorizados (registro/login/RBAC) contra PostgreSQL de test (`TEST_DATABASE_URL`); F13 sigue diferida | F2 | Instrucción directa |
+| 25 | Los tests se ejecutan con `docker-compose.test.yml` para no crear entornos virtuales locales | F2 | Instrucción directa |

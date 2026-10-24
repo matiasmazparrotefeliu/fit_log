@@ -1,11 +1,26 @@
 # ─────────────────────────────────────────────────────────────
 # FitLog / RunTracker — Backend dependencies
-# Fase 0 (inicialización): solo lo necesario para arrancar la app.
-# Cada fase agrega sus dependencias:
-#   F1 → sqlalchemy, psycopg[binary], python-jose, passlib[bcrypt],
-#        python-multipart, email-validator
-#   F2 → alembic
+# Cada fase agrega sus dependencias.
 # ─────────────────────────────────────────────────────────────
+
+# Base (F0)
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic-settings==2.7.0
+
+# Persistencia (F1)
+SQLAlchemy==2.0.36
+psycopg[binary]==3.2.3
+
+# Migraciones (F2)
+alembic==1.14.0
+
+# Seguridad / Auth (F2)
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+email-validator==2.2.0
+
+# Tests (F2)
+pytest==8.3.4
+httpx==0.27.2

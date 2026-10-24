@@ -1,0 +1,40 @@
+# ─────────────────────────────────────────────────────────────
+# FitLog / RunTracker — stack de desarrollo
+# Usa el archivo `.env` de la raíz del repositorio.
+# ─────────────────────────────────────────────────────────────
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fitlog-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fitlog}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitlog}
+      POSTGRES_DB: ${POSTGRES_DB:-fitlog}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - fitlog_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fitlog}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./backend
+    container_name: fitlog-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Dentro de la red de Docker el host de la DB es `db`, no `localhost`.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fitlog}:${POSTGRES_PASSWORD:-fitlog}@db:5432/${POSTGRES_DB:-fitlog}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  fitlog_pgdata:
