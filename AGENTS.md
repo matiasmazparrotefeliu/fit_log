@@ -154,8 +154,9 @@ cd backend && alembic revision --autogenerate -m "descripcion"
 | 18 | `security`, `rbac` y `middleware` se implementan junto con login/users/auth (F2) | F2 | Instrucción directa |
 | 19 | El cache (`CachePort`) se implementa en fases posteriores | — | Instrucción directa |
 | 20 | El manejo de errores se crea incrementalmente con cada módulo | — | Instrucción directa |
-| 21 | Roles `runner`, `admin` y `super_admin`: el registro público crea siempre `runner`; `super_admin` crea `admin`/`runner`; el primer `super_admin` se crea con `scripts/create_super_admin.py` | F2 | Instrucción directa |
+| 21 | Roles `runner`, `admin` y `super_admin`: el registro público crea siempre `runner`; `super_admin` crea `admin`/`runner`; el primer `super_admin` se crea con `POST /auth/super-admin` (bootstrap abierto sin token; luego exige rol `super_admin`) | F2 | Instrucción directa |
 | 22 | Todo endpoint declara `response_model` y schema de request; los errores usan el formato uniforme `{"detail": "..."}` | F2 | Instrucción directa |
 | 23 | Los DTOs de `application` son `dataclass`; Pydantic se usa solo en `presentation` | F2 | Instrucción directa |
 | 24 | Tests de F2 autorizados (registro/login/RBAC) contra PostgreSQL de test (`TEST_DATABASE_URL`); F13 sigue diferida | F2 | Instrucción directa |
 | 25 | Los tests se ejecutan con `docker-compose.test.yml` para no crear entornos virtuales locales | F2 | Instrucción directa |
+| 26 | El commit y rollback viven en el repositorio de infraestructura (sin Unit of Work en la capa application); los casos de uso llaman directamente al repositorio. | F2 | Instrucción directa |
