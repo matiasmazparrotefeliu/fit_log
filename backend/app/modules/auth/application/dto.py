@@ -41,3 +41,10 @@ class CreateUserInput:
     role: UserRole
     birth_date: date | None = None
     weight_kg: Decimal | None = None
+
+
+@dataclass(frozen=True)
+class CreateSuperAdminInput:
+    email: str
+    password: str
+    full_name: str
