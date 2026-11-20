@@ -47,6 +47,14 @@ class SqlAlchemyUserRepository(UserRepository):
         )
         return bool(count)
 
+    def has_super_admin(self) -> bool:
+        count = self._session.scalar(
+            select(func.count())
+            .select_from(UserModel)
+            .where(UserModel.role == UserRole.SUPER_ADMIN.value)
+        )
+        return bool(count)
+
     def list(self, offset: int, limit: int) -> tuple[list[User], int]:
         total = self._session.scalar(select(func.count()).select_from(UserModel)) or 0
         rows = self._session.scalars(

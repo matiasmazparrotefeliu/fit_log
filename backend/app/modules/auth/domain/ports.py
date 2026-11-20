@@ -24,6 +24,10 @@ class UserRepository(Protocol):
         """Indica si ya existe un usuario con ese email."""
         ...
 
+    def has_super_admin(self) -> bool:
+        """Indica si ya existe un usuario con rol `super_admin`."""
+        ...
+
     def create(
         self,
         *,

@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.rbac import Principal, get_current_principal
+from app.core.rbac import Principal, get_current_principal, require_role
 from app.modules.auth.domain.entities import User
 from app.modules.auth.domain.ports import UserRepository
 from app.modules.auth.infrastructure.repository import SqlAlchemyUserRepository

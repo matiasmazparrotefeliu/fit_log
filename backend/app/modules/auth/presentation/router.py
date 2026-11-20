@@ -3,6 +3,7 @@
 Endpoints:
 - POST /auth/register   (público)      → UserRead
 - POST /auth/login      (público)      → TokenResponse
+- POST /auth/super-admin (bootstrap; exige super_admin si ya existe) → UserRead
 - GET  /users/me        (autenticado)  → UserRead
 - PATCH /users/me       (autenticado)  → UserRead
 - GET  /users           (super_admin)  → UserListResponse
@@ -13,14 +14,16 @@ from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.rbac import require_role
+from app.core.rbac import Principal, get_optional_principal, require_role
 from app.modules.auth.application.dto import (
+    CreateSuperAdminInput,
     CreateUserInput,
     LoginInput,
     RegisterUserInput,
     UpdateProfileInput,
 )
 from app.modules.auth.application.use_cases import (
+    CreateSuperAdmin,
     CreateUser,
     ListUsers,
     LoginUser,
@@ -32,6 +35,7 @@ from app.modules.auth.domain.errors import (
     EmailAlreadyExists,
     InvalidCredentials,
     InvalidRoleAssignment,
+    SuperAdminRequired,
 )
 from app.modules.auth.domain.ports import UserRepository
 from app.modules.auth.presentation.dependencies import (
@@ -42,6 +46,7 @@ from app.modules.auth.presentation.schemas import (
     ErrorResponse,
     LoginRequest,
     RegisterRequest,
+    SuperAdminCreateRequest,
     TokenResponse,
     UserCreate,
     UserListResponse,
@@ -200,6 +205,45 @@ def create_user(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Role cannot be assigned",
+        )
+
+    return UserRead.model_validate(user)
+
+
+@auth_router.post(
+    "/super-admin",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+    },
+    summary="Crea un super_admin (bootstrap abierto; exige super_admin si ya existe)",
+)
+def create_super_admin(
+    payload: SuperAdminCreateRequest,
+    principal: Principal | None = Depends(get_optional_principal),
+    repository: UserRepository = Depends(get_user_repository),
+) -> UserRead:
+    try:
+        user = CreateSuperAdmin(repository).execute(
+            CreateSuperAdminInput(
+                email=str(payload.email),
+                password=payload.password,
+                full_name=payload.full_name,
+            ),
+            requester_role=principal.role if principal else None,
+        )
+    except EmailAlreadyExists:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
+        )
+    except SuperAdminRequired:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin required",
         )
 
     return UserRead.model_validate(user)

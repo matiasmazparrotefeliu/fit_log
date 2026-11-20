@@ -5,6 +5,7 @@ Orquestan el dominio y el puerto `UserRepository`. No conocen FastAPI.
 
 from app.core.security import create_access_token, hash_password, verify_password
 from app.modules.auth.application.dto import (
+    CreateSuperAdminInput,
     CreateUserInput,
     LoginInput,
     RegisterUserInput,
@@ -15,6 +16,7 @@ from app.modules.auth.domain.errors import (
     EmailAlreadyExists,
     InvalidCredentials,
     InvalidRoleAssignment,
+    SuperAdminRequired,
 )
 from app.modules.auth.domain.ports import UserRepository
 
@@ -101,4 +103,31 @@ class CreateUser:
             role=data.role,
             birth_date=data.birth_date,
             weight_kg=data.weight_kg,
+        )
+
+
+class CreateSuperAdmin:
+    """Crea un usuario `super_admin`.
+
+    Bootstrap: si aún no existe ningún `super_admin`, cualquiera puede crear
+    el primero. Si ya existe, solo un `super_admin` autenticado puede crear
+    otro (delegación).
+    """
+
+    def __init__(self, repository: UserRepository) -> None:
+        self._repository = repository
+
+    def execute(self, data: CreateSuperAdminInput, requester_role: str | None) -> User:
+        if self._repository.has_super_admin() and requester_role != UserRole.SUPER_ADMIN.value:
+            raise SuperAdminRequired()
+        if self._repository.exists_by_email(data.email):
+            raise EmailAlreadyExists(data.email)
+
+        return self._repository.create(
+            email=data.email,
+            password_hash=hash_password(data.password),
+            full_name=data.full_name,
+            role=UserRole.SUPER_ADMIN,
+            birth_date=None,
+            weight_kg=None,
         )

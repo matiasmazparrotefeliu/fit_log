@@ -23,3 +23,7 @@ class UserNotFound(AuthError):
 
 class InvalidRoleAssignment(AuthError):
     """El rol solicitado no puede asignarse por esta vía."""
+
+
+class SuperAdminRequired(AuthError):
+    """La operación exige un `super_admin` autenticado."""

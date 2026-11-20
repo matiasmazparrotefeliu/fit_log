@@ -276,6 +276,7 @@ No se implementan por ahora:
 
 ```
 POST   /auth/register                 POST /auth/login  → JWT
+POST   /auth/super-admin              (bootstrap abierto; exige super_admin si ya existe)
 GET    /users/me                      PATCH /users/me
 GET    /users                         (super_admin)
 POST   /users                         (super_admin; crea admin/runner)
@@ -295,7 +296,8 @@ GET                    /dashboard      (BFF Analytics)
 - **Roles:** `runner` (registro público), `admin` (creado por `super_admin`, escritura de
   catálogos como `/events`) y `super_admin` (gestiona usuarios vía `/users`). El registro
   público **nunca** permite elegir rol. El primer `super_admin` se crea con
-  `python -m scripts.create_super_admin` (bootstrap idempotente).
+  `POST /auth/super-admin` (bootstrap abierto mientras no exista ninguno; luego exige
+  rol `super_admin`).
 - Las mutaciones de `/events` exigen rol **`admin`** (o superior).
 - Todos los endpoints declaran `response_model` de éxito y esquemas Pydantic de request;
   los errores usan el formato uniforme `{"detail": "..."}` con códigos 401/403/409/422.
@@ -330,7 +332,7 @@ GET                    /dashboard      (BFF Analytics)
 | Fase | Alcance | Estado |
 |---|---|---|
 | **F0** | **Inicialización de la app**: `main.py`, `requirements.txt`, `.env.example` (raíz), limpieza legacy (Django). Sin `core`, `shared`, Alembic, seed, docker ni módulos. | ✅ |
-| **F1** | `core/` (`config`, `database`) + `shared/` (base_entity, unit_of_work, pagination) + `docker-compose.yml` (db+api) + `backend/Dockerfile` | ✅ |
+| **F1** | `core/` (`config`, `database`) + `shared/` (base_entity, pagination) + `docker-compose.yml` (db+api) + `backend/Dockerfile` | ✅ |
 | **F2** | `auth` (users + JWT + RBAC) + `security`/`rbac`/`middleware` + Alembic (migración `0001_create_users`) + bootstrap `super_admin` + tests de integración | ✅ |
 
 ### Detalle de la Fase 2 (`auth`)
@@ -347,7 +349,8 @@ GET                    /dashboard      (BFF Analytics)
   queda para una fase posterior (junto con `CachePort`).
 - **Roles:** `runner`, `admin`, **`super_admin`** (desvío aprobado de la spec original).
   Registro público → siempre `runner`; `super_admin` crea `admin`/`runner` vía `POST /users`;
-  el primer `super_admin` se crea con `scripts/create_super_admin.py` (idempotente).
+  el primer `super_admin` se crea con `POST /auth/super-admin` (bootstrap abierto;
+  luego exige rol `super_admin`).
 - **Errores:** incrementales por módulo (`auth/domain/errors.py`), traducidos a HTTP en
   `presentation`; formato uniforme `{"detail": "..."}`.
 - **Tests:** suite de integración autorizada para F2 (`backend/tests`) contra PostgreSQL

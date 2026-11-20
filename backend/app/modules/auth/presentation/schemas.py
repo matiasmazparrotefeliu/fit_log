@@ -71,6 +71,14 @@ class UserCreate(BaseModel):
     weight_kg: Decimal | None = Field(default=None, ge=0, le=999.99)
 
 
+class SuperAdminCreateRequest(BaseModel):
+    """Alta de un `super_admin` (bootstrap inicial o delegación)."""
+
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    full_name: str = Field(min_length=1, max_length=100)
+
+
 class UserListResponse(BaseModel):
     """Página de usuarios."""
 

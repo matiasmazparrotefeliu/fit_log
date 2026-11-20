@@ -51,7 +51,6 @@ fit_log/
     │   ├── shared/
     │   │   ├── __init__.py
     │   │   ├── base_entity.py   # mixin UUID PK + created_at
-    │   │   ├── unit_of_work.py
     │   │   └── pagination.py
     │   └── modules/
     │       └── auth/            # F2
@@ -63,8 +62,6 @@ fit_log/
     │   ├── env.py
     │   └── versions/0001_create_users.py
     ├── alembic.ini
-    ├── scripts/
-    │   └── create_super_admin.py  # bootstrap idempotente
     ├── tests/                   # F2 (integración)
     │   ├── conftest.py
     │   └── integration/
@@ -124,18 +121,19 @@ PK UUID (`gen_random_uuid()`), `email` único, `password_hash`, `full_name`,
 
 ### 6. Bootstrap del primer `super_admin`
 El registro público **siempre** crea `runner`. Los usuarios `admin`/`runner` los crea un
-`super_admin` vía `POST /api/v1/users`. El primer `super_admin` se crea con el script:
+`super_admin` vía `POST /api/v1/users`. El primer `super_admin` se crea con el endpoint
+de bootstrap `POST /api/v1/auth/super-admin`, que **no exige token** mientras no exista
+ningún `super_admin` en el sistema:
 
 ```bash
-cd backend
-python -m scripts.create_super_admin \
-  --email superadmin@fitlog.local \
-  --password 'ChangeMe123!' \
-  --full-name 'Super Admin'
+curl -X POST http://localhost:8000/api/v1/auth/super-admin \
+  -H 'Content-Type: application/json' \
+  -d '{"email": "superadmin@fitlog.local", "password": "ChangeMe123!", "full_name": "Super Admin"}'
 ```
 
-También acepta `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD` y `SUPER_ADMIN_FULL_NAME`.
-Es **idempotente**: si el email ya existe no lo duplica (y lo promueve a `super_admin` si hacía falta).
+Una vez creado el primero, el endpoint queda protegido: solo un `super_admin` autenticado
+puede crear otros (delegación). Si ya existe un super_admin, llamarlo sin token devuelve
+`403`.
 
 ### 7. Tests (F2)
 La suite usa una base PostgreSQL separada (`TEST_DATABASE_URL`, por defecto `fitlog_test`)
