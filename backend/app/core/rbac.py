@@ -27,19 +27,10 @@ class Principal:
     role: str
 
 
-def get_current_principal(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-) -> Principal:
-    """Dependencia: exige un Bearer token válido y devuelve el `Principal`."""
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
+def _decode_principal(token: str) -> Principal:
+    """Decodifica un token validado y construye el `Principal`."""
     try:
-        payload = decode_access_token(credentials.credentials)
+        payload = decode_access_token(token)
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -57,6 +48,29 @@ def get_current_principal(
         )
 
     return Principal(user_id=str(user_id), role=str(role))
+
+
+def get_current_principal(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> Principal:
+    """Dependencia: exige un Bearer token válido y devuelve el `Principal`."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return _decode_principal(credentials.credentials)
+
+
+def get_optional_principal(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> Principal | None:
+    """Dependencia: devuelve el `Principal` si hay token válido, o `None`."""
+    if credentials is None:
+        return None
+    return _decode_principal(credentials.credentials)
 
 
 def require_role(*roles: str):
